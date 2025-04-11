@@ -13,20 +13,16 @@ locals {
 
 dependency "vpc" {
   config_path = "../vpc"
-  mock_outputs = {
-    vpc_id = "vpc-1234567890abcdef01"
-    private_subnets = ["subnet-1234567890abcdef01", "subnet-1234567890abcdef02"]
-  }
 }
 
 inputs = {
   cluster_name    = local.env_vars.locals.cluster_name
-  cluster_version = "1.31"
+  cluster_version = "1.32"
 
   cluster_endpoint_public_access  = true
   enable_cluster_creator_admin_permissions = true
   vpc_id  = dependency.vpc.outputs.vpc_id
-  subnets = dependency.vpc.outputs.private_subnets
+  subnet_ids = dependency.vpc.outputs.private_subnets
 
   cluster_addons = {
     coredns                = {}
@@ -35,12 +31,14 @@ inputs = {
     vpc-cni                = {}
   }
 
-  node_groups = {
-    default = {
-      desired_capacity = 2
-      min_capacity     = 1
-      max_capacity     = 3
-      instance_type    = "t3.medium"
+  eks_managed_node_groups = {
+    app = {
+      ami_type       = "AL2_x86_64"
+      instance_types = ["t3.medium"]
+
+      min_size = 1
+      max_size = 3
+      desired_size = 1
     }
   }
 
