@@ -141,6 +141,7 @@ resource "kubernetes_manifest" "cert_manager_argo_app" {
       }
       destination = {
         server = "https://kubernetes.default.svc"
+        namespace = "kube-system"
       }
       syncPolicy = {
         automated = {
@@ -176,8 +177,8 @@ resource "kubernetes_manifest" "external_dns_argo_app" {
           values = yamlencode({
             replicaCount = 1
             serviceAccount = {
-              create = true
-              name   = "external-dns"
+              create      = true
+              name        = "external-dns"
               annotations = {
                 "eks.amazonaws.com/role-arn" = local.external_dns_role_name
               }
@@ -190,6 +191,7 @@ resource "kubernetes_manifest" "external_dns_argo_app" {
       }
       destination = {
         server = "https://kubernetes.default.svc"
+        namespace = "kube-system"
       }
       syncPolicy = {
         automated = {
@@ -238,7 +240,7 @@ resource "aws_eks_pod_identity_association" "barkuni" {
 }
 
 resource "kubernetes_manifest" "barkuni_argo_app" { 
-  depends_on      = [helm_release.argocd]
+  depends_on = [helm_release.argocd]
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
@@ -251,14 +253,15 @@ resource "kubernetes_manifest" "barkuni_argo_app" {
       source = {
         repoURL        = var.private_repo_url
         targetRevision = "HEAD"
-        path           = "barkuni-app"
+        path           = "k8s/apps/barkuni-app"
         helm = {
-          parameters = [
-            {
-              name  = "serviceAccount.annotations.eks.amazonaws.com/role-arn"
-              value = aws_eks_pod_identity_association.barkuni.role_arn
-            },
-          ]
+          values = yamlencode({
+            serviceAccount = {
+              annotations = {
+                "eks.amazonaws.com/role-arn" = aws_eks_pod_identity_association.barkuni.role_arn
+              }
+            }
+          })
         }
       }
       destination = {
@@ -268,7 +271,7 @@ resource "kubernetes_manifest" "barkuni_argo_app" {
       syncPolicy = {
         automated = {
           selfHeal = true
-          prune     = true
+          prune    = true
         }
       }
     }
