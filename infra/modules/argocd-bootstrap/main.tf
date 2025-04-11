@@ -172,7 +172,7 @@ resource "kubernetes_manifest" "external_dns_argo_app" {
       source = {
         repoURL        = "https://charts.bitnami.com/bitnami"
         chart          = "external-dns"
-        targetRevision = "8.7.11"
+        targetRevision = "8.7.9"
         helm = {
           values = yamlencode({
             replicaCount = 1
