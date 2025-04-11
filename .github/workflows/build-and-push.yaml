@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-      contents: read
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -59,9 +59,16 @@ jobs:
           platforms: linux/amd64
           push: true
 
+      - name: Extract short sha tag
+        id: extract_sha
+        run: |
+          FULL_TAG="${{ steps.meta.outputs.tags }}"
+          SHORT_TAG="${FULL_TAG#*:}"
+          echo "short_tag=${SHORT_TAG}" >> "$GITHUB_OUTPUT"
+
       - name: Update image tag
         run: |
-          yq e -i ".image.tag = \"${{ steps.meta.outputs.tags }}\"" ./k8s/apps/barkuni-app/values.yaml
+          yq e -i ".image.tag = \"${{ steps.extract_sha.outputs.short_tag }}\"" ./k8s/apps/barkuni-app/values.yaml
 
       - name: Commit changes
         run: |
@@ -69,5 +76,5 @@ jobs:
           git config --global user.name "GitOps"
           git add ./k8s/apps/barkuni-app/values.yaml
           git pull --rebase --autostash
-          git commit -m "Update image tag to ${{ steps.meta.outputs.tags }}"
+          git commit -m "Update image tag to ${{ steps.extract_sha.outputs.short_tag}}"
           git push
