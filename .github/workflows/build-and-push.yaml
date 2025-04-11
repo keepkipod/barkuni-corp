@@ -41,14 +41,13 @@ jobs:
           images: ${{ env.image_name }}
           tags: |
             type=sha,priority=1100
-            latest
           labels: |
             org.opencontainers.image.title=${{ env.image_name }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
       - name: Build and push image
         uses: docker/build-push-action@v6
-        id: build-base
+        id: build
         with:
           cache-from: type=registry,ref=${{ env.image_name }}/cache:latest-cache
           cache-to: type=registry,ref=${{ env.image_name }}/cache:latest-cache,mode=max
