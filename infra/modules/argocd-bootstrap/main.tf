@@ -8,6 +8,19 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 3.0.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">= 2.8.0"
+    }
+  }
+}
+
+provider "helm" {
+  # These connection details can be passed through variables if needed.
+  kubernetes {
+    host                   = var.kube_host
+    cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
+    token                  = var.kube_token
   }
 }
 
@@ -15,6 +28,19 @@ provider "kubectl" {
   host                   = var.kube_host
   cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
   token                  = var.kube_token
+}
+
+###############################################
+# Install ArgoCD via Helm Release
+###############################################
+resource "helm_release" "argocd" {
+  name             = var.argocd_release_name
+  namespace        = var.argocd_namespace
+  repository       = var.argocd_chart_repo
+  chart            = var.argocd_chart_name
+  version          = var.argocd_chart_version
+  create_namespace = var.argocd_create_namespace
+  values           = var.argocd_values
 }
 
 ###############################################
