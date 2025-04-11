@@ -14,6 +14,13 @@ spec:
     helm:
       values: |
         replicaCount: 1
+        serviceAccount:
+          create: true
+          name: external-dns
+          annotations:
+            eks.amazonaws.com/role-arn: "${irsa_role_arn}"
+        provider: aws
+        txtOwnerId: "barkuni-dev"
         interval: 1m
   destination:
     server: https://kubernetes.default.svc

@@ -4,10 +4,6 @@ data "aws_eks_cluster_auth" "eks" {
 
 terraform {
   required_providers {
-    kubectl = {
-      source  = "gavinbunney/kubectl"
-      version = "1.19.0"
-    }
     aws = {
       source  = "hashicorp/aws"
       version = ">= 3.0.0"
@@ -30,7 +26,7 @@ provider "helm" {
   }
 }
 
-provider "kubectl" {
+provider "kubernetes" {
   host                   = var.kube_host
   cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
   token                  = var.kube_token
@@ -115,34 +111,98 @@ resource "aws_iam_role_policy_attachment" "external_dns_policy_attach" {
 }
 
 #############################################################
-# Deploy Cert-manager ArgoCD Application via kubectl_manifest
+# Deploy Cert-manager ArgoCD Application
 #############################################################
-resource "kubectl_manifest" "cert_manager" {
-  depends_on = [helm_release.argocd]
-  validate_schema = false
-  yaml_body = templatefile(
-    "${path.module}/manifests/cert-manager.yaml", {
-      namespace = var.cert_manager_namespace
+resource "kubernetes_manifest" "cert_manager_argo_app" {
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "cert-manager-argo-app"
+      namespace = "argocd"
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = "0"
+      }
     }
-  )
+    spec = {
+      project = "default"
+      source = {
+        repoURL        = "https://charts.jetstack.io"
+        chart          = "cert-manager"
+        targetRevision = "1.17.0"
+        helm = {
+          values = yamlencode({
+            installCRDs = true
+            extraArgs   = [
+              "--enable-certificate-owner-ref=true"
+            ]
+          })
+        }
+      }
+      destination = {
+        server = "https://kubernetes.default.svc"
+      }
+      syncPolicy = {
+        automated = {
+          selfHeal = true
+          prune    = true
+        }
+      }
+    }
+  }
 }
 
 #############################################################
-# Deploy External-dns ArgoCD Application via kubectl_manifest
+# Deploy External-dns ArgoCD Application
 #############################################################
-resource "kubectl_manifest" "external_dns" {
-  depends_on = [helm_release.argocd]
-  validate_schema = false
-  yaml_body = templatefile(
-    "${path.module}/manifests/external-dns.yaml", {
-      irsa_role_arn = aws_iam_role.external_dns_irsa.arn,
-      namespace     = var.external_dns_namespace
+resource "kubernetes_manifest" "external_dns_argo_app" {
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "external-dns-argo-app"
+      namespace = "argocd"
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = "1"
+      }
     }
-  )
+    spec = {
+      project = "default"
+      source = {
+        repoURL        = "https://charts.bitnami.com/bitnami"
+        chart          = "external-dns"
+        targetRevision = "8.7.11"
+        helm = {
+          values = yamlencode({
+            replicaCount = 1
+            serviceAccount = {
+              create = true
+              name   = "external-dns"
+              annotations = {
+                "eks.amazonaws.com/role-arn" = local.external_dns_role_name
+              }
+            }
+            provider   = "aws"
+            txtOwnerId = "barkuni-dev"
+            interval   = "1m"
+          })
+        }
+      }
+      destination = {
+        server = "https://kubernetes.default.svc"
+      }
+      syncPolicy = {
+        automated = {
+          selfHeal = true
+          prune    = true
+        }
+      }
+    }
+  }
 }
 
 #############################################################
-# Deploy Main Application (barkuni-app) via kubectl_manifest
+# Deploy Main Application (barkuni-app)
 #############################################################
 data "aws_iam_policy_document" "assume_role" {
   statement {
@@ -177,15 +237,40 @@ resource "aws_eks_pod_identity_association" "barkuni" {
   role_arn        = aws_iam_role.role.arn
 }
 
-resource "kubectl_manifest" "barkuni_app" {
-  depends_on = [helm_release.argocd]
-  validate_schema = false
-  yaml_body = templatefile(
-    "${path.module}/manifests/barkuni-app.yaml", {
-      repo_url  = var.private_repo_url,
-      app_path  = var.bootstrap_app_path,
-      namespace = var.bootstrap_app_namespace
-      service_account = aws_eks_pod_identity_association.barkuni.role_arn
+resource "kubernetes_manifest" "barkuni_argo_app" { 
+  depends_on      = [helm_release.argocd]
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "barkuni-app"
+      namespace = "argocd"
     }
-  )
+    spec = {
+      project = "default"
+      source = {
+        repoURL        = var.private_repo_url
+        targetRevision = "HEAD"
+        path           = "barkuni-app"
+        helm = {
+          parameters = [
+            {
+              name  = "serviceAccount.annotations.eks.amazonaws.com/role-arn"
+              value = aws_eks_pod_identity_association.barkuni.role_arn
+            },
+          ]
+        }
+      }
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = "default"
+      }
+      syncPolicy = {
+        automated = {
+          selfHeal = true
+          prune     = true
+        }
+      }
+    }
+  }
 }

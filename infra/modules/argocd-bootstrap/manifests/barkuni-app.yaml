@@ -11,11 +11,6 @@ spec:
     repoURL: "${repo_url}"
     targetRevision: HEAD
     path: "${app_path}"
-    helm:
-      values: |
-        serviceAccount:
-          annotations:
-            eks.amazonaws.com/role-arn=${service_account}
   destination:
     server: https://kubernetes.default.svc
     namespace: ${namespace}
