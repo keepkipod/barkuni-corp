@@ -144,6 +144,39 @@ resource "kubectl_manifest" "external_dns" {
 #############################################################
 # Deploy Main Application (barkuni-app) via kubectl_manifest
 #############################################################
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+
+    actions = [
+      "sts:AssumeRole",
+      "sts:TagSession"
+    ]
+  }
+}
+
+resource "aws_iam_role" "role" {
+  name               = "${var.eks_cluster_name}-role"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "ec2-full-access-attachment" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+  role       = aws_iam_role.role.name
+}
+
+resource "aws_eks_pod_identity_association" "barkuni" {
+  cluster_name    = var.eks_cluster_name
+  namespace       = "default"
+  service_account = "barkuni"
+  role_arn        = aws_iam_role.role.arn
+}
+
 resource "kubectl_manifest" "barkuni_app" {
   depends_on = [helm_release.argocd]
   validate_schema = false
@@ -152,6 +185,7 @@ resource "kubectl_manifest" "barkuni_app" {
       repo_url  = var.private_repo_url,
       app_path  = var.bootstrap_app_path,
       namespace = var.bootstrap_app_namespace
+      service_account = aws_eks_pod_identity_association.barkuni.role_arn
     }
   )
 }
