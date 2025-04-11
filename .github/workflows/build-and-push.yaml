@@ -1,0 +1,73 @@
+name: Build And Push Image
+
+on:
+  push:
+    paths:
+      - 'app/**'
+
+env:
+  AWS_REGION: us-east-1
+  image_name: barkuni
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Version Docker image
+        uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.image_name }}
+          tags: |
+            type=sha,priority=1100
+            latest
+          labels: |
+            org.opencontainers.image.title=${{ env.image_name }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        id: build-base
+        with:
+          cache-from: type=registry,ref=${{ env.image_name }}/cache:latest-cache
+          cache-to: type=registry,ref=${{ env.image_name }}/cache:latest-cache,mode=max
+          context: app
+          file: ./app/Dockerfile
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: ${{ steps.meta.outputs.tags }}
+          platforms: linux/amd64
+          push: true
+
+      - name: Update image tag
+        run: |
+          yq e -i ".image.tag = \"${{ steps.meta.outputs.tags }}\"" ./k8s/apps/barkuni-app/values.yaml
+
+      - name: Commit changes
+        run: |
+          git config --global user.email "devops@github.com"
+          git config --global user.name "GitOps"
+          git add ./k8s/apps/barkuni-app/values.yaml
+          git pull --rebase --autostash
+          git commit -m "Update image tag to ${{ steps.meta.outputs.tags }}"
+          git push
