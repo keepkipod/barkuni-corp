@@ -1,21 +1,25 @@
-# ---------------------------
-# Deploy ArgoCD via Helm Release
-# ---------------------------
-resource "helm_release" "argocd" {
-  count            = var.deploy_argocd ? 1 : 0
-  name             = var.name
-  namespace        = var.namespace
-  repository       = var.repository
-  chart            = var.chart
-  version          = var.version
-  create_namespace = var.create_namespace
-  values           = var.values
+terraform {
+  required_providers {
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = "1.19.0"
+    }
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 3.0.0"
+    }
+  }
 }
 
-#######################################################
-# Create IAM Role for external-dns IRSA
-#######################################################
+provider "kubectl" {
+  host                   = var.kube_host
+  cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
+  token                  = var.kube_token
+}
 
+###############################################
+# Create IRSA role for external-dns (for IRSA)
+###############################################
 locals {
   external_dns_role_name = "${var.bootstrap_external_dns_app_name}-irsa-role"
 }
@@ -25,26 +29,24 @@ resource "aws_iam_role" "external_dns_irsa" {
 
   assume_role_policy = jsonencode({
     "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": {
-          "Federated": var.eks_oidc_provider_arn
-        },
-        "Action": "sts:AssumeRoleWithWebIdentity",
-        "Condition": {
-          "StringEquals": {
-            "${var.eks_oidc_provider_url}:sub": "system:serviceaccount:${var.external_dns_sa_namespace}:${var.external_dns_sa_name}"
-          }
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": var.eks_oidc_provider_arn
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "${var.eks_oidc_provider_url}:sub": "system:serviceaccount:${var.external_dns_namespace}:${var.external_dns_sa_name}"
         }
       }
-    ]
+    }]
   })
 }
 
 resource "aws_iam_policy" "external_dns_policy" {
   name        = "${local.external_dns_role_name}-policy"
-  description = "Policy for external-dns IRSA to manage Route53 records"
+  description = "Policy for external-dns to manage Route53 records"
   policy      = <<EOF
 {
   "Version": "2012-10-17",
@@ -74,122 +76,41 @@ resource "aws_iam_role_policy_attachment" "external_dns_policy_attach" {
   policy_arn = aws_iam_policy.external_dns_policy.arn
 }
 
-###########################################################
-# Bootstrap cert-manager via ArgoCD Application (Sync Wave 0)
-###########################################################
-resource "kubernetes_manifest" "bootstrap_cert_manager" {
-  count = var.bootstrap_cert_manager ? 1 : 0
-
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = var.bootstrap_cert_manager_app_name
-      namespace = var.namespace
-      annotations = {
-        "argocd.argoproj.io/sync-wave" = "0"
-      }
+#############################################################
+# Deploy Cert-manager ArgoCD Application via kubectl_manifest
+#############################################################
+resource "kubectl_manifest" "cert_manager" {
+  validate_schema = false
+  yaml_body = templatefile(
+    "${path.module}/manifests/cert-manager.yaml", {
+      namespace = var.cert_manager_namespace
     }
-    spec = {
-      project = "default"
-      source = {
-        repoURL        = var.bootstrap_cert_manager_chart_repo
-        chart          = var.bootstrap_cert_manager_chart
-        targetRevision = var.bootstrap_cert_manager_chart_version
-        helm = {
-          values = var.bootstrap_cert_manager_values
-        }
-      }
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = "kube-system"
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-      }
-    }
-  }
+  )
 }
 
-###############################################################
-# Bootstrap external-dns via ArgoCD Application (Sync Wave 1)
-# This uses a template file to inject the generated IRSA role ARN.
-###############################################################
-resource "kubernetes_manifest" "bootstrap_external_dns" {
-  count = var.bootstrap_external_dns ? 1 : 0
-
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = var.bootstrap_external_dns_app_name
-      namespace = var.namespace
-      annotations = {
-        "argocd.argoproj.io/sync-wave" = "1"
-      }
+#############################################################
+# Deploy External-dns ArgoCD Application via kubectl_manifest
+#############################################################
+resource "kubectl_manifest" "external_dns" {
+  validate_schema = false
+  yaml_body = templatefile(
+    "${path.module}/manifests/external-dns.yaml", {
+      irsa_role_arn = aws_iam_role.external_dns_irsa.arn,
+      namespace     = var.external_dns_namespace
     }
-    spec = {
-      project = "default"
-      source = {
-        repoURL        = var.bootstrap_external_dns_chart_repo
-        chart          = var.bootstrap_external_dns_chart
-        targetRevision = var.bootstrap_external_dns_chart_version
-        helm = {
-          values = templatefile("${path.module}/external-dns-values.yaml.tpl", {
-            irsa_role_arn = aws_iam_role.external_dns_irsa.arn
-          })
-        }
-      }
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = "kube-system"
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-      }
-    }
-  }
+  )
 }
 
-#######################################################
-# Bootstrap main app via ArgoCD Application (Sync Wave 2)
-#######################################################
-resource "kubernetes_manifest" "bootstrap_app" {
-  count = var.bootstrap_app ? 1 : 0
-
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = var.bootstrap_app_name
-      namespace = var.namespace
-      annotations = {
-        "argocd.argoproj.io/sync-wave" = "2"
-      }
+#############################################################
+# Deploy Main Application (barkuni-app) via kubectl_manifest
+#############################################################
+resource "kubectl_manifest" "barkuni_app" {
+  validate_schema = false
+  yaml_body = templatefile(
+    "${path.module}/manifests/barkuni-app.yaml", {
+      repo_url  = var.private_repo_url,
+      app_path  = var.bootstrap_app_path,
+      namespace = var.bootstrap_app_namespace
     }
-    spec = {
-      project = "default"
-      source = {
-        repoURL        = var.private_repo_url
-        targetRevision = "HEAD"
-        path           = var.bootstrap_app_path
-      }
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = var.bootstrap_app_namespace
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-      }
-    }
-  }
+  )
 }
