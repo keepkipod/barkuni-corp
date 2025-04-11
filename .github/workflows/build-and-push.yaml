@@ -3,11 +3,12 @@ name: Build And Push Image
 on:
   push:
     paths:
+      - '.github/workflows/build-and-push.yaml'
       - 'app/**'
 
 env:
   AWS_REGION: us-east-1
-  image_name: barkuni
+  image_name: 058264138725.dkr.ecr.us-east-1.amazonaws.com/barkuni-app
 
 jobs:
   build-and-push:
