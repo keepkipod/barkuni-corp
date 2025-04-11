@@ -1,3 +1,7 @@
+data "aws_eks_cluster_auth" "eks" {
+  name = var.eks_cluster_name
+}
+
 terraform {
   required_providers {
     kubectl = {
@@ -15,8 +19,10 @@ terraform {
   }
 }
 
+#######################
+# Providers
+#######################
 provider "helm" {
-  # These connection details can be passed through variables if needed.
   kubernetes {
     host                   = var.kube_host
     cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
@@ -30,9 +36,9 @@ provider "kubectl" {
   token                  = var.kube_token
 }
 
-###############################################
+#############################
 # Install ArgoCD via Helm Release
-###############################################
+#############################
 resource "helm_release" "argocd" {
   name             = var.argocd_release_name
   namespace        = var.argocd_namespace
@@ -40,7 +46,13 @@ resource "helm_release" "argocd" {
   chart            = var.argocd_chart_name
   version          = var.argocd_chart_version
   create_namespace = var.argocd_create_namespace
-  values           = var.argocd_values
+
+  values = concat(
+    var.argocd_values,
+    [
+      "installCRDs: true"
+    ]
+  )
 }
 
 ###############################################
@@ -106,6 +118,7 @@ resource "aws_iam_role_policy_attachment" "external_dns_policy_attach" {
 # Deploy Cert-manager ArgoCD Application via kubectl_manifest
 #############################################################
 resource "kubectl_manifest" "cert_manager" {
+  depends_on = [helm_release.argocd]
   validate_schema = false
   yaml_body = templatefile(
     "${path.module}/manifests/cert-manager.yaml", {
@@ -118,6 +131,7 @@ resource "kubectl_manifest" "cert_manager" {
 # Deploy External-dns ArgoCD Application via kubectl_manifest
 #############################################################
 resource "kubectl_manifest" "external_dns" {
+  depends_on = [helm_release.argocd]
   validate_schema = false
   yaml_body = templatefile(
     "${path.module}/manifests/external-dns.yaml", {
@@ -131,6 +145,7 @@ resource "kubectl_manifest" "external_dns" {
 # Deploy Main Application (barkuni-app) via kubectl_manifest
 #############################################################
 resource "kubectl_manifest" "barkuni_app" {
+  depends_on = [helm_release.argocd]
   validate_schema = false
   yaml_body = templatefile(
     "${path.module}/manifests/barkuni-app.yaml", {

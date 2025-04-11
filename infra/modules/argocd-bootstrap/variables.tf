@@ -1,3 +1,8 @@
+variable "eks_cluster_name" {
+  description = "Cluster Name"
+  type        = string
+}
+
 variable "kube_host" {
   description = "Kubernetes API server endpoint"
   type        = string
