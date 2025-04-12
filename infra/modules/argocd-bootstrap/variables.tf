@@ -1,5 +1,15 @@
+variable "vpc_id" {
+  description = "VPC ID"
+  type        = string
+}
+
 variable "eks_cluster_name" {
   description = "Cluster Name"
+  type        = string
+}
+
+variable "region" {
+  description = "Region"
   type        = string
 }
 

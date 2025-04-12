@@ -31,7 +31,45 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
   token                  = var.kube_token
 }
+/*
+resource "aws_iam_policy" "aws_lb_controller_policy" {
+  name        = "AWSLoadBalancerControllerIAMPolicy"
+  description = "IAM policy for AWS Load Balancer Controller"
+  policy      = file("iam_policy.json")
+}
 
+#############################################################
+# Deploy AWS LoadBalancer Controller 
+#############################################################
+resource "helm_release" "awslb" {
+  name      = "aws-load-balancer-controller"
+  repository = "https://aws.github.io/eks-charts"
+  chart     = "aws-load-balancer-controller"
+  namespace = "kube-system"
+  version = "1.12.0"
+
+  set {
+    name  = "clusterName"
+    value = "var.eks_cluster_name"
+  }
+  set {
+    name  = "serviceAccount.create"
+    value = "false"
+  }
+  set {
+    name  = "serviceAccount.name"
+    value = "aws-load-balancer-controller"
+  }
+  set {
+    name  = "region"
+    value = var.region
+  }
+  set {
+    name  = "vpcId"
+    value = var.vpc_id
+  }
+}
+*/
 #############################
 # Install ArgoCD via Helm Release
 #############################
@@ -50,7 +88,7 @@ resource "helm_release" "argocd" {
     ]
   )
 }
-
+/*
 ###############################################
 # Create IRSA role for external-dns (for IRSA)
 ###############################################
@@ -154,14 +192,14 @@ resource "kubernetes_manifest" "cert_manager_argo_app" {
 }
 
 #############################################################
-# Deploy External-dns ArgoCD Application
+# Deploy nginx ArgoCD Application
 #############################################################
-resource "kubernetes_manifest" "external_dns_argo_app" {
+resource "kubernetes_manifest" "nginx_argo_app" {
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
-      name      = "external-dns-argo-app"
+      name      = "nginx-argo-app"
       namespace = "argocd"
       annotations = {
         "argocd.argoproj.io/sync-wave" = "1"
@@ -170,75 +208,39 @@ resource "kubernetes_manifest" "external_dns_argo_app" {
     spec = {
       project = "default"
       source = {
-        repoURL        = "https://charts.bitnami.com/bitnami"
-        chart          = "external-dns"
-        targetRevision = "8.7.9"
+        repoURL        = "https://kubernetes.github.io/ingress-nginx"
+        chart          = "ingress-nginx"
+        targetRevision = "4.12.1"
         helm = {
           values = yamlencode({
-            replicaCount = 1
-            serviceAccount = {
-              create      = true
-              name        = "external-dns"
-              annotations = {
-                "eks.amazonaws.com/role-arn" = local.external_dns_role_name
+            controller = {
+              service = {
+                type = "LoadBalancer"
               }
             }
-            provider   = "aws"
-            txtOwnerId = "barkuni-dev"
-            interval   = "1m"
           })
         }
       }
       destination = {
-        server = "https://kubernetes.default.svc"
-        namespace = "kube-system"
+        server    = "https://kubernetes.default.svc"
+        namespace = "ingress-nginx"
       }
       syncPolicy = {
         automated = {
           selfHeal = true
           prune    = true
         }
+        syncOptions = [
+          "CreateNamespace=true"
+        ]
       }
     }
   }
 }
-
+*/
 #############################################################
-# Deploy Main Application (barkuni-app)
+# Deploy Barkuni ArgoCD Application
 #############################################################
-data "aws_iam_policy_document" "assume_role" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["pods.eks.amazonaws.com"]
-    }
-
-    actions = [
-      "sts:AssumeRole",
-      "sts:TagSession"
-    ]
-  }
-}
-
-resource "aws_iam_role" "role" {
-  name               = "${var.eks_cluster_name}-role"
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
-}
-
-resource "aws_iam_role_policy_attachment" "ec2-full-access-attachment" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
-  role       = aws_iam_role.role.name
-}
-
-resource "aws_eks_pod_identity_association" "barkuni" {
-  cluster_name    = var.eks_cluster_name
-  namespace       = "default"
-  service_account = "barkuni"
-  role_arn        = aws_iam_role.role.arn
-}
-
 resource "kubernetes_manifest" "barkuni_argo_app" { 
   depends_on = [helm_release.argocd]
   manifest = {
@@ -247,6 +249,9 @@ resource "kubernetes_manifest" "barkuni_argo_app" {
     metadata = {
       name      = "barkuni-app"
       namespace = "argocd"
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = "2"
+      }
     }
     spec = {
       project = "default"
@@ -254,15 +259,6 @@ resource "kubernetes_manifest" "barkuni_argo_app" {
         repoURL        = var.private_repo_url
         targetRevision = "HEAD"
         path           = "k8s/apps/barkuni-app"
-        helm = {
-          values = yamlencode({
-            serviceAccount = {
-              annotations = {
-                "eks.amazonaws.com/role-arn" = aws_eks_pod_identity_association.barkuni.role_arn
-              }
-            }
-          })
-        }
       }
       destination = {
         server    = "https://kubernetes.default.svc"
