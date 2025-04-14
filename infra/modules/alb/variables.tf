@@ -1,54 +1,54 @@
-variable "name" {
-  description = "The name for the ALB"
-  type        = string
-}
-
-variable "subnets" {
-  description = "The public subnets to attach the ALB to"
-  type        = list(string)
-}
-
-variable "security_groups" {
-  description = "Pre-existing security group IDs to attach to the ALB. If empty and create_security_group is true, a security group will be created."
-  type        = list(string)
-  default     = []
-}
-
-variable "create_security_group" {
-  description = "If true, create a security group for the ALB if none is provided"
-  type        = bool
-  default     = true
-}
-
 variable "vpc_id" {
-  description = "The VPC ID"
+  description = "VPC ID for ALB"
   type        = string
+}
+
+variable "public_subnets" {
+  description = "List of public subnet IDs for the ALB"
+  type        = list(string)
 }
 
 variable "tags" {
-  description = "Tags to apply to the ALB and security group"
+  description = "Tags for ALB resources"
   type        = map(string)
   default     = {}
 }
 
-variable "target_group_port" {
-  description = "Port for the target group"
-  type        = number
-  default     = 80
+variable "alb_name" {
+  description = "Name for the ALB"
+  type        = string
 }
 
-variable "target_group_protocol" {
-  description = "Protocol for the target group"
+variable "alb_sg_name" {
+  description = "Name for the ALB security group"
+  type        = string
+}
+
+variable "alb_ingress_cidr" {
+  description = "CIDR blocks allowed to access the ALB (for ingress)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "alb_tg_name" {
+  description = "Name for the ALB target group"
+  type        = string
+}
+
+variable "alb_tg_protocol" {
+  description = "Backend protocol for the target group"
   type        = string
   default     = "HTTP"
 }
 
-variable "zone_id" {
-  description = "Route 53 Hosted Zone ID for the domain"
-  type        = string
+variable "alb_tg_port" {
+  description = "Backend port for the target group"
+  type        = number
+  default     = 80
 }
 
-variable "domain_name" {
-  description = "FQDN that will point to the ALB (e.g., test.vicarius.xyz)"
-  type        = string
+variable "alb_listener_port" {
+  description = "Listener port for the ALB"
+  type        = number
+  default     = 80
 }

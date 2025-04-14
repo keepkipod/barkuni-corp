@@ -1,27 +1,14 @@
-#############################
-# Create ALB Security Group
-#############################
 resource "aws_security_group" "alb" {
-  count       = var.create_security_group && length(var.security_groups) == 0 ? 1 : 0
-
-  name        = "${var.name}-sg"
-  description = "Security group for ALB ${var.name}"
+  name        = var.alb_sg_name
+  description = "Security group for ALB ${var.alb_name}"
   vpc_id      = var.vpc_id
 
   ingress {
-    description = "Allow HTTP"
+    description = "Allow HTTP traffic"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Allow HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.alb_ingress_cidr
   }
 
   egress {
@@ -32,87 +19,36 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(var.tags, {
-    Name = "${var.name}-sg"
-  })
+  tags = var.tags
 }
 
-#############################
-# Determine Final Security Groups
-#############################
-locals {
-  final_security_groups = length(var.security_groups) > 0 ? var.security_groups : [aws_security_group.alb[0].id]
-}
-
-#############################
-# Provision the ALB using the terraform-aws-modules/alb/aws module
-#############################
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "9.15.0"
 
-  name               = var.name
+  name               = var.alb_name
   load_balancer_type = "application"
   internal           = false
-  subnets            = var.subnets
-  security_groups    = local.final_security_groups
   vpc_id             = var.vpc_id
+  subnets            = var.public_subnets
+  security_groups    = [aws_security_group.alb.id]
 
-  target_groups = {
-    default = {
-      name_prefix      = substr(var.name, 0, 6)
-      backend_protocol = var.target_group_protocol
+  target_groups = [
+    {
+      name             = var.alb_tg_name
+      backend_protocol = var.alb_tg_protocol
+      backend_port     = var.alb_tg_port
       target_type      = "ip"
-      port             = var.target_group_port
     }
-  }
+  ]
 
-  listeners = {
-    alb_listener = {
-      port = 80
-      protocol = "HTTP"
-      default_actions = [
-        {
-          type             = "forward"
-          target_group_key = "default"
-        }
-      ]
+  http_tcp_listeners = [
+    {
+      port               = var.alb_listener_port
+      protocol           = "HTTP"
+      target_group_index = 0
     }
-    ex-fixed-response = {
-      port     = 82
-      protocol = "HTTP"
-      fixed_response = {
-        content_type = "text/plain"
-        message_body = "Fixed message"
-        status_code  = "200"
-      }
-    }
-  }
-
-  additional_target_group_attachments = {}
+  ]
 
   tags = var.tags
-}
-
-#############################
-# Create a Route 53 A record pointing your domain to the ALB
-#############################
-resource "aws_route53_record" "alb_record" {
-  zone_id = var.zone_id
-  name    = var.domain_name
-  type    = "A"
-
-  alias {
-    name                   = module.alb.dns_name
-    zone_id                = module.alb.zone_id
-    evaluate_target_health = true
-  }
-}
-
-#############################
-# Output the ALB DNS Name
-#############################
-output "alb_dns_name" {
-  description = "The DNS name of the Application Load Balancer"
-  value       = module.alb.dns_name
 }
