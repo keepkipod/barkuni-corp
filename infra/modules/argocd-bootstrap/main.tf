@@ -190,7 +190,7 @@ resource "kubernetes_manifest" "cert_manager_argo_app" {
     }
   }
 }
-
+*/
 #############################################################
 # Deploy nginx ArgoCD Application
 #############################################################
@@ -237,7 +237,7 @@ resource "kubernetes_manifest" "nginx_argo_app" {
     }
   }
 }
-*/
+
 #############################################################
 # Deploy Barkuni ArgoCD Application
 #############################################################
