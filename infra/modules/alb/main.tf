@@ -58,32 +58,38 @@ module "alb" {
   security_groups    = local.final_security_groups
   vpc_id             = var.vpc_id
 
-  target_groups = [
-    {
-      # Use a truncated name prefix to comply with the 6-character limit.
+  target_groups = {
+    default = {
       name_prefix      = substr(var.name, 0, 6)
       backend_protocol = var.target_group_protocol
       target_type      = "ip"
       port             = var.target_group_port
     }
-  ]
+  }
 
-  listeners = [
-    {
-      port            = 80
-      protocol        = "HTTP"
-      # Note the key name "default_actions" (plural) is used here.
+  listeners = {
+    alb_listener = {
+      port = 80
+      protocol = "HTTP"
       default_actions = [
         {
-          type               = "forward"
-          target_group_index = 0
+          type             = "forward"
+          target_group_key = "default"
         }
       ]
     }
-  ]
+    ex-fixed-response = {
+      port     = 82
+      protocol = "HTTP"
+      fixed_response = {
+        content_type = "text/plain"
+        message_body = "Fixed message"
+        status_code  = "200"
+      }
+    }
+  }
 
-  # Provide an empty list to avoid processing target group attachments.
-  additional_target_group_attachments = []
+  additional_target_group_attachments = {}
 
   tags = var.tags
 }
