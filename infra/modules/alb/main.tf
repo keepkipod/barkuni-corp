@@ -38,6 +38,15 @@ module "alb" {
       backend_protocol = "HTTP"
       backend_port     = 80
       target_type      = "ip"
+      health_check = {
+        path                = "/health" 
+        protocol            = "HTTP"
+        healthy_threshold   = 2
+        unhealthy_threshold = 2
+        interval            = 30
+        timeout             = 5
+        matcher             = "200"
+      }
     }
   ]
 
