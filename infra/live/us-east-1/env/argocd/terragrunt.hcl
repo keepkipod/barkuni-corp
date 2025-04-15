@@ -22,7 +22,7 @@ locals {
 inputs = {
   kube_host              = dependency.eks.outputs.cluster_endpoint
   cluster_ca_certificate = dependency.eks.outputs.cluster_certificate_authority_data
-  kube_token             = "k8s-aws-v1.aHR0cHM6Ly9zdHMudXMtZWFzdC0xLmFtYXpvbmF3cy5jb20vP0FjdGlvbj1HZXRDYWxsZXJJZGVudGl0eSZWZXJzaW9uPTIwMTEtMDYtMTUmWC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBUTNFR1FHUFNVQUtURFQ2TSUyRjIwMjUwNDE1JTJGdXMtZWFzdC0xJTJGc3RzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNTA0MTVUMDg1NjAwWiZYLUFtei1FeHBpcmVzPTYwJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCUzQngtazhzLWF3cy1pZCZYLUFtei1TaWduYXR1cmU9MGNlNTVmNmJkZjg4MzAwOGVjYmU0NDcxNzQyMDdlNzE2NzI3NTgzMTViNDc0OTEzMzhhMTRjZThhMDcxMzVhYQ"
+  kube_token             = "k8s-aws-v1.aHR0cHM6Ly9zdHMudXMtZWFzdC0xLmFtYXpvbmF3cy5jb20vP0FjdGlvbj1HZXRDYWxsZXJJZGVudGl0eSZWZXJzaW9uPTIwMTEtMDYtMTUmWC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBUTNFR1FHUFNVQUtURFQ2TSUyRjIwMjUwNDE1JTJGdXMtZWFzdC0xJTJGc3RzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNTA0MTVUMTAzMjI3WiZYLUFtei1FeHBpcmVzPTYwJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCUzQngtazhzLWF3cy1pZCZYLUFtei1TaWduYXR1cmU9ODNjMDcyMzQ4NmVmZTMxZTExYTdmYzNiMTI0MDQwN2RmM2E3ZWQ1ZTkxMjJlNDZmMDI2ZjM2ZGVkY2MxNzQzZQ"
   eks_cluster_name       = local.env_vars.locals.cluster_name
   region                 = local.region.locals.region
   vpc_id                 = dependency.vpc.outputs.vpc_id

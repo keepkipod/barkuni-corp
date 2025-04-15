@@ -5,8 +5,8 @@ include {
 dependency "alb" {
   config_path = "../alb"
   mock_outputs = {
-    alb_dns_name = "mock-alb-dns.amazonaws.com"
-    alb_zone_id  = "Z123456ABCDEFG"
+    alb_dns_name = "dualstack.k8s-default-barkuni-d6b4e0119b-43202206.us-east-1.elb.amazonaws.com"
+    alb_zone_id  = "Z05252683ATTVWQ56KS7F"
   }
 }
 
