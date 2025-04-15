@@ -36,7 +36,7 @@ module "alb" {
     {
       name             = "barkuni-tg"
       backend_protocol = "HTTP"
-      backend_port     = 80
+      backend_port     = 8000
       target_type      = "ip"
       health_check = {
         path                = "/health" 

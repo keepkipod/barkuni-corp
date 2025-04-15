@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "barkuni-app.fullname" . }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-target-group-arn: "arn:aws:elasticloadbalancing:us-east-1:058264138725:targetgroup/barkuni-tg/01a70b1a5fa41767"
   labels:
     {{- include "barkuni-app.labels" . | nindent 4 }}
 spec:
