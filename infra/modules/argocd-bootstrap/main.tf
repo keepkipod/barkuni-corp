@@ -237,7 +237,7 @@ resource "kubernetes_manifest" "nginx_argo_app" {
     }
   }
 }
-
+/*
 #############################################################
 # Deploy Barkuni ArgoCD Application
 #############################################################
@@ -272,4 +272,4 @@ resource "kubernetes_manifest" "barkuni_argo_app" {
       }
     }
   }
-}
+} */

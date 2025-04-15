@@ -11,9 +11,19 @@ resource "helm_release" "aws_lb_controller" {
 
   set {
     name  = "serviceAccount.create"
-    value = "false"
+    value = "true"
   }
 
+  set {
+    name  = "serviceAccount.name"
+    value = "aws-load-balancer-controller"
+  }
+
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = var.lb_role_arn
+  }
+/*
   set {
     name  = "region"
     value = var.region
@@ -22,5 +32,5 @@ resource "helm_release" "aws_lb_controller" {
   set {
     name  = "vpcId"
     value = var.vpc_id
-  }
+  } */
 }

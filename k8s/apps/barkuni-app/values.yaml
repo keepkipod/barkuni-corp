@@ -15,7 +15,7 @@ image:
 imagePullSecrets: []
 # This is to override the chart name.
 nameOverride: ""
-fullnameOverride: barkuni
+fullnameOverride: barkunii
 #This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
   # Specifies whether a service account should be created
@@ -56,7 +56,7 @@ ingress:
   className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
     alb.ingress.kubernetes.io/target-type: ip
   hosts:
     - host: test.vicarius.xyz
